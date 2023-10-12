@@ -5,7 +5,6 @@ use std::io;
 // A token to allow us to identify which event is for the `UdpSocket`.
 const UDP_SOCKET: Token = Token(0);
 
-#[cfg(target_os = "windows")]
 fn main() -> io::Result<()> {
     use std::{collections::HashMap, rc::Rc};
 

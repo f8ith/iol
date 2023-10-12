@@ -18,8 +18,16 @@ postcard = { version = "1.0.8", features = ["alloc"] }
 sdl2 = { version="0.35.2" }
 serde = { version = "1.0.188", features = ["derive"] }
 
-[target.'cfg(windows)'.dependencies]
+[target.'cfg(target_os = "windows")'.dependencies]
 vigem-client = "0.1.4"
+
+[target.'cfg(target_os = "windows")'.features]
+default = ["vigem"]
+vigem = []
+
+[target.'cfg(not(target_os = "windows"))'.features]
+default  = []
+vigem = []
 
 [patch.crates-io]
 sdl2 = {git="https://github.com/Rust-SDL2/rust-sdl2.git" }
@@ -31,3 +39,4 @@ path = "src/broadcast.rs"
 [[bin]]
 name = "iol-listen"
 path = "src/listen.rs"
+required-features = ["vigem"]

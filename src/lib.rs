@@ -3,6 +3,8 @@ use sdl2::{
     keyboard::Scancode,
 };
 use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "vigem")]
 pub mod vigem;
 
 #[derive(Serialize, Deserialize, Debug)]
