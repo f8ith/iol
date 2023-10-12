@@ -15,7 +15,7 @@ imgui-sdl2-support = { git = "https://github.com/f8ith/imgui-rs" }
 log = "0.4.20"
 mio = { version = "0.8.8", features = ["net", "os-poll"] }
 postcard = { version = "1.0.8", features = ["alloc"] }
-sdl2 = "0.35.2"
+sdl2 = { version="0.35.2", features = ["bundled", "static-link"]}
 serde = { version = "1.0.188", features = ["derive"] }
 
 [target.'cfg(windows)'.dependencies]
