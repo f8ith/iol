@@ -3,6 +3,7 @@ use sdl2::{
     keyboard::Scancode,
 };
 use serde::{Deserialize, Serialize};
+pub mod vigem;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum IolEvent {

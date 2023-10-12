@@ -7,11 +7,13 @@ const UDP_SOCKET: Token = Token(0);
 
 #[cfg(target_os = "windows")]
 fn main() -> io::Result<()> {
-    use std::collections::HashMap;
+    use std::{collections::HashMap, rc::Rc};
 
-    use iol::IolEvent;
+    use iol::{vigem::ViGEMState, IolEvent};
     use mio::net::UdpSocket;
     use postcard::{from_bytes, to_vec};
+    use sdl2::controller::Button;
+    use vigem_client::TargetId;
 
     env_logger::init();
 
@@ -32,8 +34,8 @@ fn main() -> io::Result<()> {
     println!("You can connect to the server via port 4863");
 
     let mut buf = [0; 1 << 16];
-    let mut controllers: HashMap<u32, GamepadState> = HashMap::new();
-    let vigem_client = vigem_client::Client::connect().unwrap();
+    let mut controllers: HashMap<u32, ViGEMState> = HashMap::new();
+    let vigem_client = Rc::new(vigem_client::Client::connect().unwrap());
 
     loop {
         if let Err(err) = poll.poll(&mut events, None) {
@@ -66,9 +68,13 @@ fn main() -> io::Result<()> {
                                     //TODO Setup controller device added
                                     let id = controllers.len() as u32;
                                     println!("Controller with index {} was added.", id);
-
-                                    controllers.insert(id, 0);
-                                    let mut target = vigem_client::Xbox360Wired::new(client, id);
+                                    let mut target = vigem_client::Xbox360Wired::new(
+                                        vigem_client.clone(),
+                                        TargetId::XBOX360_WIRED,
+                                    );
+                                    target.plugin().unwrap();
+                                    target.wait_ready().unwrap();
+                                    controllers.insert(id, ViGEMState::new(vigem_client.clone()));
 
                                     let serialized =
                                         to_vec::<IolEvent, 32>(&IolEvent::VirtualDeviceAdded {
@@ -89,9 +95,17 @@ fn main() -> io::Result<()> {
                                 }
                                 IolEvent::ButtonDown { id, button } => {
                                     println!("Controller with index {} pressed {:?}.", id, button);
+                                    let controller = controllers.get_mut(&id);
+                                    if let Some(controller) = controller {
+                                        controller.from_sdl2_button(button, true)
+                                    }
                                 }
                                 IolEvent::ButtonUp { id, button } => {
                                     println!("Controller with index {} released {:?}.", id, button);
+                                    let controller = controllers.get_mut(&id);
+                                    if let Some(controller) = controller {
+                                        controller.from_sdl2_button(button, false);
+                                    }
                                 }
                                 IolEvent::AxisMotion {
                                     id, axis, value, ..
@@ -100,6 +114,10 @@ fn main() -> io::Result<()> {
                                         "Controller with index {} moved axis {:?} to {:?}.",
                                         id, axis, value
                                     );
+                                    let controller = controllers.get_mut(&id);
+                                    if let Some(controller) = controller {
+                                        controller.from_sdl2_axis(axis, value);
+                                    }
                                 }
                                 _ => {}
                             }
