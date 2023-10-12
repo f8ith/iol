@@ -1,5 +1,5 @@
 use sdl2::{
-    controller::{Axis, Button, GameController},
+    controller::{Axis, Button},
     keyboard::Scancode,
 };
 use serde::{Deserialize, Serialize};
