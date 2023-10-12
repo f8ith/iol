@@ -29,7 +29,7 @@ fn glow_context(window: &Window) -> glow::Context {
     }
 }
 
-#[cfg(not(TARGET_OS = "WASI"))]
+#[cfg((TARGET_OS = "Windows"))]
 fn main() -> io::Result<()> {
     use std::time::Duration;
 

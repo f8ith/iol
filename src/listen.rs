@@ -32,7 +32,8 @@ fn main() -> io::Result<()> {
     println!("You can connect to the server via port 4863");
 
     let mut buf = [0; 1 << 16];
-    let mut controllers: HashMap<u32, u32> = HashMap::new();
+    let mut controllers: HashMap<u32, GamepadState> = HashMap::new();
+    let vigem_client = vigem_client::Client::connect().unwrap();
 
     loop {
         if let Err(err) = poll.poll(&mut events, None) {
@@ -67,6 +68,7 @@ fn main() -> io::Result<()> {
                                     println!("Controller with index {} was added.", id);
 
                                     controllers.insert(id, 0);
+                                    let mut target = vigem_client::Xbox360Wired::new(client, id);
 
                                     let serialized =
                                         to_vec::<IolEvent, 32>(&IolEvent::VirtualDeviceAdded {

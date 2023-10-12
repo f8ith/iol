@@ -3,27 +3,24 @@ use sdl2::{
     keyboard::Scancode,
 };
 use serde::{Deserialize, Serialize};
+use vigem_client::{XGamepad, Xbox360Wired};
 
-pub struct IolGameController {
-    controller: GameController,
-    id: Option<u32>,
+pub struct GamepadState {
+    state: XGamepad,
+    target: Xbox360Wired,
 }
 
-impl IolGameController {
-    pub fn new(controller: GameController, id: Option<u32>) -> Self {
-        IolGameController { controller, id }
+impl GamepadState {
+    pub fn new(target: XGamepad, target: Xbox360Wired) -> Self {
+        GamepadState { state, target }
     }
 
-    pub fn id(&self) -> Option<u32> {
-        self.id
+    pub fn state(&mut self) -> &mut XGamepad {
+        &mut self.state
     }
 
-    pub fn set_id(&mut self, id: u32) {
-        self.id = Some(id)
-    }
-
-    pub fn controller(&self) -> &GameController {
-        &self.controller
+    pub fn controller(&self) -> &mut Xbox360Wired {
+        &mut self.controller
     }
 }
 
