@@ -29,7 +29,6 @@ fn glow_context(window: &Window) -> glow::Context {
     }
 }
 
-#[cfg((TARGET_OS = "Windows"))]
 fn main() -> io::Result<()> {
     use std::time::Duration;
 
@@ -198,6 +197,11 @@ fn main() -> io::Result<()> {
                 Event::ControllerAxisMotion {
                     which, axis, value, ..
                 } => {
+                    println!(
+                        "Controller with index {} moved axis {:?} to {:?}.",
+                        which, axis, value
+                    );
+
                     let id = controllers_netids.get(&which);
                     if let Some(id) = id {
                         let serialized = to_vec::<IolEvent, 32>(&IolEvent::AxisMotion {
@@ -261,10 +265,7 @@ fn main() -> io::Result<()> {
                                             "Controller with index {} was added on the listener.",
                                             id
                                         );
-                                            let id_ref = controllers_netids
-                                                .get_mut(&which)
-                                                .expect("Unexpected controller id.");
-                                            *id_ref = id;
+                                            controllers_netids.insert(which, id);
                                             break 'listen;
                                         }
                                         _ => {}

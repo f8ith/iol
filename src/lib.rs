@@ -3,26 +3,6 @@ use sdl2::{
     keyboard::Scancode,
 };
 use serde::{Deserialize, Serialize};
-use vigem_client::{XGamepad, Xbox360Wired};
-
-pub struct GamepadState {
-    state: XGamepad,
-    target: Xbox360Wired,
-}
-
-impl GamepadState {
-    pub fn new(target: XGamepad, target: Xbox360Wired) -> Self {
-        GamepadState { state, target }
-    }
-
-    pub fn state(&mut self) -> &mut XGamepad {
-        &mut self.state
-    }
-
-    pub fn controller(&self) -> &mut Xbox360Wired {
-        &mut self.controller
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum IolEvent {
