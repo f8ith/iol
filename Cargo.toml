@@ -1,0 +1,27 @@
+[package]
+name = "iol"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = { version = "4.4.6", features = ["derive"] }
+env_logger = "0.10.0"
+glow = "0.12.3"
+imgui = { git = "https://github.com/f8ith/imgui-rs" }
+imgui-glow-renderer = { git = "https://github.com/f8ith/imgui-rs" }
+imgui-sdl2-support = { git = "https://github.com/f8ith/imgui-rs" }
+log = "0.4.20"
+mio = { version = "0.8.8", features = ["net", "os-poll"] }
+postcard = { version = "1.0.8", features = ["alloc"] }
+sdl2 = "0.35.2"
+serde = { version = "1.0.188", features = ["derive"] }
+
+[[bin]]
+name = "iol-broadcast"
+path = "src/broadcast.rs"
+
+[[bin]]
+name = "iol-listen"
+path = "src/listen.rs"

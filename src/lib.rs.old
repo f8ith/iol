@@ -1,0 +1,49 @@
+use sdl2::controller::{Axis, Button, GameController};
+use vigem_client::XGamepad;
+
+pub struct IolGameController {
+    controller: GameController,
+    state: XGamepad,
+    id: u32,
+}
+
+impl IolGameController {
+    pub fn new(controller: GameController, id: u32) -> Self {
+        let state = XGamepad {
+            ..Default::default()
+        };
+        IolGameController {
+            controller,
+            state,
+            id,
+        }
+    }
+
+    pub fn id(&self) -> &u32 {
+        &self.id
+    }
+
+    pub fn controller(&self) -> &GameController {
+        &self.controller
+    }
+
+    pub fn set_axis(&mut self, axis: Axis, value: i16) {
+        let state = &self.state;
+        match axis {
+            Axis::LeftX => state.thumb_lx = value,
+            Axis::LeftY => state.thumb_ly = value,
+            Axis::RightX => state.thumb_rx = value,
+            Axis::RightY => state.thumb_ry = value,
+            Axis::TriggerLeft => state.left_trigger = value,
+            Axis::TriggerRight => state.right_trigger = value,
+        }
+    }
+
+    pub fn button_up(&mut self, button: Button) {
+        let mut state = self.state;
+    }
+
+    pub fn get_state(&mut self) -> &XGamepad {
+        &self.state
+    }
+}
