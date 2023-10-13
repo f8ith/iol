@@ -235,7 +235,6 @@ fn main() -> io::Result<()> {
                 ui.input_text("Server Address", &mut server_address_str)
                     .build();
                 if ui.button("Connect") {
-                    println!("here");
                     server_address = server_address_str
                         .parse()
                         .expect("Unable to parse socket address");

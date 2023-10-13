@@ -2,8 +2,8 @@ use log::warn;
 use mio::{Events, Interest, Poll, Token};
 use std::io;
 
-// A token to allow us to identify which event is for the `UdpSocket`.
 const UDP_SOCKET: Token = Token(0);
+const PORT: &str = "4863";
 
 fn main() -> io::Result<()> {
     use std::{collections::HashMap, rc::Rc};
@@ -11,26 +11,23 @@ fn main() -> io::Result<()> {
     use iol::{vigem::ViGEMState, IolEvent};
     use mio::net::UdpSocket;
     use postcard::{from_bytes, to_vec};
-    use sdl2::controller::Button;
     use vigem_client::TargetId;
 
     env_logger::init();
 
     let mut poll = Poll::new()?;
     let mut events = Events::with_capacity(1);
-    let addr = "0.0.0.0:4863".parse().unwrap();
+    let addr = ("0.0.0.0".to_owned() + PORT).parse().unwrap();
 
     let mut socket = UdpSocket::bind(addr)?;
 
-    // Register our socket with the token defined above and an interest in being
-    // `READABLE`.
     poll.registry().register(
         &mut socket,
         UDP_SOCKET,
         Interest::WRITABLE | Interest::READABLE,
     )?;
 
-    println!("You can connect to the server via port 4863");
+    println!("You can connect to the server via port {}", PORT);
 
     let mut buf = [0; 1 << 16];
     let mut controllers: HashMap<u32, ViGEMState> = HashMap::new();
@@ -44,11 +41,7 @@ fn main() -> io::Result<()> {
             return Err(err);
         }
 
-        // Process each event.
         for event in events.iter() {
-            // Validate the token we registered our socket with,
-            // in this example it will only ever be one but we
-            // make sure it's valid none the less.
             match event.token() {
                 UDP_SOCKET => loop {
                     match socket.recv_from(&mut buf) {
@@ -130,9 +123,6 @@ fn main() -> io::Result<()> {
                     }
                 },
                 _ => {
-                    // This should never happen as we only registered our
-                    // `UdpSocket` using the `UDP_SOCKET` token, but if it ever
-                    // does we'll log it.
                     warn!("Got event for unexpected token: {:?}", event);
                 }
             }
