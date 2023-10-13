@@ -19,15 +19,11 @@ sdl2 = { version="0.35.2" }
 serde = { version = "1.0.188", features = ["derive"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-vigem-client = "0.1.4"
+vigem-client = { version = "0.1.4", optional = true }
 
-[target.'cfg(target_os = "windows")'.features]
-default = ["vigem"]
-vigem = []
-
-[target.'cfg(not(target_os = "windows"))'.features]
-default  = []
-vigem = []
+[features]
+default = []
+vigem = ["dep:vigem-client"]
 
 [patch.crates-io]
 sdl2 = {git="https://github.com/Rust-SDL2/rust-sdl2.git" }
