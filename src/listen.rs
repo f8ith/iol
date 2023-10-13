@@ -51,18 +51,12 @@ fn main() -> io::Result<()> {
                         Ok((packet_size, source_address)) => {
                             let event = from_bytes::<IolEvent>(&buf[..packet_size]);
                             match event.unwrap() {
-                                IolEvent::KeyDown { scancode, repeat } => {
-                                    if !repeat {
-                                        println!("Scancode {:?} was pressed.", scancode)
-                                    };
-                                }
-                                IolEvent::KeyUp { scancode } => {
-                                    println!("Scancode {:?} was released.", scancode);
-                                }
+                                // TODO: Keyboard emulation
+                                IolEvent::KeyDown { .. } => {}
+                                IolEvent::KeyUp { .. } => {}
                                 IolEvent::PhysicalDeviceAdded { which } => {
-                                    //TODO Setup controller device added
                                     let id = controllers.len() as u32;
-                                    println!("Controller with index {} was added.", id);
+                                    println!("Controller {} was added.", id);
                                     let mut target = vigem_client::Xbox360Wired::new(
                                         vigem_client.clone(),
                                         TargetId::XBOX360_WIRED,
@@ -79,24 +73,19 @@ fn main() -> io::Result<()> {
                                         .unwrap();
 
                                     socket.send_to(serialized.as_slice(), source_address)?;
-                                    println!(
-                                        "Controller virtual device with index {} was added.",
-                                        id
-                                    )
+                                    println!("Controller virtual device {} was added.", id)
                                 }
                                 IolEvent::PhysicalDeviceRemoved { id } => {
                                     controllers.remove(&id);
-                                    println!("Controller with index {} was removed.", id);
+                                    println!("Controller {} was removed.", id);
                                 }
                                 IolEvent::ButtonDown { id, button } => {
-                                    println!("Controller with index {} pressed {:?}.", id, button);
                                     let controller = controllers.get_mut(&id);
                                     if let Some(controller) = controller {
                                         controller.from_sdl2_button(button, true)
                                     }
                                 }
                                 IolEvent::ButtonUp { id, button } => {
-                                    println!("Controller with index {} released {:?}.", id, button);
                                     let controller = controllers.get_mut(&id);
                                     if let Some(controller) = controller {
                                         controller.from_sdl2_button(button, false);
@@ -105,10 +94,6 @@ fn main() -> io::Result<()> {
                                 IolEvent::AxisMotion {
                                     id, axis, value, ..
                                 } => {
-                                    println!(
-                                        "Controller with index {} moved axis {:?} to {:?}.",
-                                        id, axis, value
-                                    );
                                     let controller = controllers.get_mut(&id);
                                     if let Some(controller) = controller {
                                         controller.from_sdl2_axis(axis, value);

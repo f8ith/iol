@@ -1,13 +1,14 @@
-use chrono::Utc;
 use glow::HasContext;
 use imgui::{Condition, Context};
 use imgui_glow_renderer::AutoRenderer;
 use imgui_sdl2_support::SdlPlatform;
 use iol::IolEvent;
+use mio::net::UdpSocket;
 use mio::Events;
 use mio::{Interest, Poll, Token};
 use postcard::from_bytes;
 use postcard::to_vec;
+use sdl2::controller::GameController;
 use sdl2::{
     event::Event,
     video::{GLProfile, Window},
@@ -17,6 +18,7 @@ use std::io;
 use std::net::IpAddr;
 use std::net::Ipv4Addr;
 use std::net::SocketAddr;
+use std::time::Duration;
 
 const SCREEN_WIDTH: u32 = 1280;
 const SCREEN_HEIGHT: u32 = 720;
@@ -30,13 +32,59 @@ fn glow_context(window: &Window) -> glow::Context {
     }
 }
 
+fn setup_controller_id(
+    controller: &GameController,
+    controllers_netids: &mut HashMap<u32, u32>,
+    socket: &UdpSocket,
+    poll: &mut Poll,
+    events: &mut Events,
+    server_address: SocketAddr,
+) -> Result<(), io::Error> {
+    let mut buf = [0; 1 << 16];
+
+    let serialized = to_vec::<IolEvent, 32>(&IolEvent::PhysicalDeviceAdded {
+        which: controller.instance_id(),
+    })
+    .unwrap();
+    let result = socket.send_to(serialized.as_slice(), server_address);
+    match result {
+        Ok(_) => {}
+        Err(e) => {
+            return Err(e);
+        }
+    }
+    loop {
+        if let Err(err) = poll.poll(events, Some(Duration::from_secs(5))) {
+            match err.kind() {
+                io::ErrorKind::Interrupted => {
+                    continue;
+                }
+                _ => {
+                    return Err(err);
+                }
+            }
+        }
+        match socket.recv_from(&mut buf) {
+            Ok((packet_size, _)) => {
+                let event = from_bytes::<IolEvent>(&buf[..packet_size]).unwrap();
+
+                match event {
+                    IolEvent::VirtualDeviceAdded { id, which } => {
+                        println!("Controller {} was added on the listener.", id);
+                        controllers_netids.insert(id, which);
+                        return Ok(());
+                    }
+                    _ => {}
+                }
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        }
+    }
+}
+
 fn main() -> io::Result<()> {
-    use std::time::Duration;
-
-    // Setup UDP
-    use mio::net::UdpSocket;
-    use sdl2::controller::GameController;
-
     env_logger::init();
 
     let mut poll = Poll::new()?;
@@ -50,13 +98,15 @@ fn main() -> io::Result<()> {
         Interest::WRITABLE | Interest::READABLE,
     )?;
 
-    let mut buf = [0; 1 << 16];
+    //    let mut buf = [0; 1 << 16];
 
     let mut broadcast_keyboard = true;
     let mut broadcast_gamepad = true;
-    let mut server_address_str = "127.0.0.1:4863".to_owned();
+    let mut server_address_str = "192.168.1.12:4863".to_owned();
     let mut server_address: SocketAddr =
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 4863);
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 12)), 4863);
+
+    let mut connected: bool = false;
 
     'wait: loop {
         if let Err(err) = poll.poll(&mut events, None) {
@@ -78,7 +128,7 @@ fn main() -> io::Result<()> {
     let video_subsystem = sdl.video().unwrap();
     let controller_subsystem = sdl.game_controller().unwrap();
     controller_subsystem.set_event_state(true);
-    let mut controllers: HashMap<u32, GameController> = HashMap::new();
+    let mut controllers: Vec<GameController> = vec![];
     let mut controllers_netids: HashMap<u32, u32> = HashMap::new();
 
     /* hint SDL to initialize an OpenGL 3.3 core profile context */
@@ -131,7 +181,6 @@ fn main() -> io::Result<()> {
                     scancode, repeat, ..
                 } => {
                     if !repeat {
-                        println!("{}: Scancode {:?} was pressed.", Utc::now(), scancode);
                         if broadcast_keyboard {
                             let serialized = to_vec::<IolEvent, 32>(&IolEvent::KeyDown {
                                 scancode: scancode.unwrap(),
@@ -144,7 +193,6 @@ fn main() -> io::Result<()> {
                     }
                 }
                 Event::KeyUp { scancode, .. } => {
-                    println!("{:?}: Scancode {:?} was released.", Utc::now(), scancode);
                     if broadcast_keyboard {
                         let serialized = to_vec::<IolEvent, 32>(&IolEvent::KeyUp {
                             scancode: scancode.unwrap(),
@@ -155,13 +203,25 @@ fn main() -> io::Result<()> {
                     }
                 }
                 Event::ControllerDeviceAdded { which, .. } => {
-                    println!("Controller with index {} was added.", which);
+                    println!("Controller {} was added.", which);
 
                     match controller_subsystem.open(which) {
                         Ok(c) => {
-                            println!("Success: opened \"{}\"", c.name());
-
-                            controllers.insert(which, c);
+                            controllers.push(c);
+                            if connected {
+                                setup_controller_id(
+                                    &controllers
+                                        .iter()
+                                        .find(|&c| c.instance_id() == which)
+                                        .unwrap(),
+                                    &mut controllers_netids,
+                                    &socket,
+                                    &mut poll,
+                                    &mut events,
+                                    server_address,
+                                )
+                                .expect("Unable to setup controller.");
+                            }
                         }
                         Err(e) => {
                             println!("failed: {:?}", e);
@@ -170,18 +230,24 @@ fn main() -> io::Result<()> {
                 }
 
                 Event::ControllerDeviceRemoved { which, .. } => {
-                    println!("Controller with index {} was removed.", which);
-                    controllers.remove(&which);
+                    let id = controllers_netids.get(&which).cloned();
+                    if let Some(id) = id {
+                        let serialized =
+                            to_vec::<IolEvent, 32>(&IolEvent::PhysicalDeviceRemoved { id })
+                                .unwrap();
+                        socket.send_to(serialized.as_slice(), server_address)?;
+                        controllers_netids.remove(&id);
+                    }
 
-                    //TODO: Remove controller from server.
+                    controllers.remove(
+                        controllers
+                            .iter()
+                            .position(|c| c.instance_id() == which)
+                            .unwrap(),
+                    );
+                    println!("Controller {} was removed.", which);
                 }
                 Event::ControllerButtonDown { which, button, .. } => {
-                    println!(
-                        "{:?}: Controller with index {} pressed {:?}.",
-                        Utc::now(),
-                        which,
-                        button
-                    );
                     let id = controllers_netids.get(&which);
                     if let Some(id) = id {
                         let serialized =
@@ -191,12 +257,6 @@ fn main() -> io::Result<()> {
                     }
                 }
                 Event::ControllerButtonUp { which, button, .. } => {
-                    println!(
-                        "{:?}: Controller with index {} released {:?}.",
-                        Utc::now(),
-                        which,
-                        button
-                    );
                     let id = controllers_netids.get(&which);
                     if let Some(id) = id {
                         let serialized =
@@ -208,17 +268,22 @@ fn main() -> io::Result<()> {
                 Event::ControllerAxisMotion {
                     which, axis, value, ..
                 } => {
-                    println!(
-                        "Controller with index {} moved axis {:?} to {:?}.",
-                        which, axis, value
-                    );
-
                     let id = controllers_netids.get(&which);
+                    let fixed_value = match axis {
+                        sdl2::controller::Axis::LeftY | sdl2::controller::Axis::RightX => {
+                            if value == -32768 {
+                                (value + 1) * -1
+                            } else {
+                                value * -1
+                            }
+                        }
+                        _ => value,
+                    };
                     if let Some(id) = id {
                         let serialized = to_vec::<IolEvent, 32>(&IolEvent::AxisMotion {
                             id: *id,
                             axis,
-                            value,
+                            value: fixed_value,
                         })
                         .unwrap();
                         socket.send_to(serialized.as_slice(), server_address)?;
@@ -228,12 +293,9 @@ fn main() -> io::Result<()> {
             }
         }
 
-        if broadcast_gamepad {}
-
         platform.prepare_frame(&mut imgui, &window, &event_pump);
         let ui = imgui.new_frame();
 
-        ui.show_demo_window(&mut true);
         ui.window("Receivers")
             .size([300.0, 300.0], Condition::FirstUseEver)
             .build(|| {
@@ -245,53 +307,46 @@ fn main() -> io::Result<()> {
 
                 ui.input_text("Server Address", &mut server_address_str)
                     .build();
-                if ui.button("Connect") {
-                    server_address = server_address_str
-                        .parse()
-                        .expect("Unable to parse socket address");
-                    for controller in controllers.iter() {
-                        let serialized = to_vec::<IolEvent, 32>(&IolEvent::PhysicalDeviceAdded {
-                            which: controller.1.instance_id(),
-                        })
-                        .unwrap();
-                        socket.send_to(serialized.as_slice(), server_address).ok();
-
-                        'listen: loop {
-                            println!("here");
-                            if let Err(err) = poll.poll(&mut events, Some(Duration::from_secs(5))) {
-                                if err.kind() == io::ErrorKind::Interrupted {
-                                    continue 'listen;
+                if !connected {
+                    if ui.button("Connect") {
+                        server_address = server_address_str
+                            .parse()
+                            .expect("Unable to parse socket address");
+                        for controller in controllers.iter() {
+                            let result = setup_controller_id(
+                                controller,
+                                &mut controllers_netids,
+                                &socket,
+                                &mut poll,
+                                &mut events,
+                                server_address,
+                            );
+                            match result {
+                                Ok(()) => {
+                                    connected = true;
                                 }
-                                return Err(err);
-                            }
-                            match socket.recv_from(&mut buf) {
-                                Ok((packet_size, _)) => {
-                                    let event =
-                                        from_bytes::<IolEvent>(&buf[..packet_size]).unwrap();
-
-                                    match event {
-                                        IolEvent::VirtualDeviceAdded { id, which } => {
-                                            println!(
-                                            "Controller with index {} was added on the listener.",
-                                            id
-                                        );
-                                            controllers_netids.insert(which, id);
-                                            break 'listen;
-                                        }
-                                        _ => {}
+                                Err(e) => match e.kind() {
+                                    _ => {
+                                        println!("Unable to setup controller. {:#?}", e)
                                     }
-                                }
-                                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                                    break 'listen;
-                                }
-                                Err(e) => {
-                                    return Err(e);
-                                }
+                                },
                             }
                         }
                     }
+                } else {
+                    if ui.button("Disconnect") {
+                        for controller in controllers_netids.iter() {
+                            let id = *controller.0;
+                            let serialized =
+                                to_vec::<IolEvent, 32>(&IolEvent::PhysicalDeviceRemoved { id })
+                                    .unwrap();
+                            socket.send_to(serialized.as_slice(), server_address).ok();
+                            println!("Controller {} was removed on the listener.", id);
+                        }
+                        controllers_netids.clear();
+                        connected = false;
+                    }
                 }
-                Ok(())
             });
 
         ui.window("Controllers")
@@ -303,7 +358,17 @@ fn main() -> io::Result<()> {
                     .begin(ui);
                 let mut controller_iter = controllers.iter();
                 for _ in clipper.iter() {
-                    ui.text(controller_iter.next().unwrap().1.name());
+                    let controller = controller_iter.next().unwrap();
+                    ui.text(controller.name());
+                    ui.same_line();
+                    let id = controllers_netids.get(&controller.instance_id());
+                    let id_string = if let Some(id) = id {
+                        format!("id: {}", id)
+                    } else {
+                        "id: n/a".to_string()
+                    };
+
+                    ui.text_colored([1.0, 1.0, 0.0, 1.0], id_string);
                 }
             });
 
