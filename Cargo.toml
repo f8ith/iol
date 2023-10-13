@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+chrono = "0.4.31"
 clap = { version = "4.4.6", features = ["derive"] }
 env_logger = "0.10.0"
 glow = "0.12.3"
@@ -15,7 +16,7 @@ imgui-sdl2-support = { git = "https://github.com/f8ith/imgui-rs" }
 log = "0.4.20"
 mio = { version = "0.8.8", features = ["net", "os-poll"] }
 postcard = { version = "1.0.8", features = ["alloc"] }
-sdl2 = { version="0.35.2" }
+sdl2 = { version = "0.35.2", features = ["bundled", "static-link"] }
 serde = { version = "1.0.188", features = ["derive"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
@@ -26,7 +27,7 @@ default = []
 vigem = ["dep:vigem-client"]
 
 [patch.crates-io]
-sdl2 = {git="https://github.com/Rust-SDL2/rust-sdl2.git" }
+sdl2 = { git = "https://github.com/Rust-SDL2/rust-sdl2.git" }
 
 [[bin]]
 name = "iol-broadcast"

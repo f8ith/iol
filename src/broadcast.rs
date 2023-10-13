@@ -1,3 +1,4 @@
+use chrono::Utc;
 use glow::HasContext;
 use imgui::{Condition, Context};
 use imgui_glow_renderer::AutoRenderer;
@@ -130,7 +131,7 @@ fn main() -> io::Result<()> {
                     scancode, repeat, ..
                 } => {
                     if !repeat {
-                        println!("Scancode {:?} was pressed.", scancode);
+                        println!("{}: Scancode {:?} was pressed.", Utc::now(), scancode);
                         if broadcast_keyboard {
                             let serialized = to_vec::<IolEvent, 32>(&IolEvent::KeyDown {
                                 scancode: scancode.unwrap(),
@@ -143,7 +144,7 @@ fn main() -> io::Result<()> {
                     }
                 }
                 Event::KeyUp { scancode, .. } => {
-                    println!("Scancode {:?} was released.", scancode);
+                    println!("{:?}: Scancode {:?} was released.", Utc::now(), scancode);
                     if broadcast_keyboard {
                         let serialized = to_vec::<IolEvent, 32>(&IolEvent::KeyUp {
                             scancode: scancode.unwrap(),
@@ -175,7 +176,12 @@ fn main() -> io::Result<()> {
                     //TODO: Remove controller from server.
                 }
                 Event::ControllerButtonDown { which, button, .. } => {
-                    println!("Controller with index {} pressed {:?}.", which, button);
+                    println!(
+                        "{:?}: Controller with index {} pressed {:?}.",
+                        Utc::now(),
+                        which,
+                        button
+                    );
                     let id = controllers_netids.get(&which);
                     if let Some(id) = id {
                         let serialized =
@@ -185,7 +191,12 @@ fn main() -> io::Result<()> {
                     }
                 }
                 Event::ControllerButtonUp { which, button, .. } => {
-                    println!("Controller with index {} released {:?}.", which, button);
+                    println!(
+                        "{:?}: Controller with index {} released {:?}.",
+                        Utc::now(),
+                        which,
+                        button
+                    );
                     let id = controllers_netids.get(&which);
                     if let Some(id) = id {
                         let serialized =

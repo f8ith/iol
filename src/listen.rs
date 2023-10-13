@@ -1,9 +1,12 @@
 use log::warn;
 use mio::{Events, Interest, Poll, Token};
-use std::io;
+use std::{
+    io,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+};
 
 const UDP_SOCKET: Token = Token(0);
-const PORT: &str = "4863";
+const PORT: u16 = 4863;
 
 fn main() -> io::Result<()> {
     use std::{collections::HashMap, rc::Rc};
@@ -17,7 +20,7 @@ fn main() -> io::Result<()> {
 
     let mut poll = Poll::new()?;
     let mut events = Events::with_capacity(1);
-    let addr = ("0.0.0.0".to_owned() + PORT).parse().unwrap();
+    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), PORT);
 
     let mut socket = UdpSocket::bind(addr)?;
 
